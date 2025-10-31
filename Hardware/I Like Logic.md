@@ -124,7 +124,7 @@ Running the script decodes the raw signal and prints a readable ASCII string:TFC
 
 ## Flag:
 ```
-TFCCTF{Th1s_1s_som3_s1mpl3_4rdu1no_f1rmw4re}
+FCSC{b1dee4eeadf6c4e60aeb142b0b486344e64b12b40d1046de95c89ba5e23a9925}
 ```
 ## Concepts Learned
 
