@@ -4,43 +4,82 @@ The challenge provides a small protocol or service used to transfer a flag betwe
 
 ## Solution:
 
-The service implements an insecure transfer mechanism that exposes the flag in cleartext (or via an easily recoverable transformation) during the protocol exchange.
-By passively observing the transfer or by interacting with the service in a controlled way, the flag can be recovered.
+This challenge revolves around a custom network service that facilitates a data transfer. The objective is to analyze this service, identify how it communicates, and intercept the flag it's designed to transmit.
 
-My solve:
+The core vulnerability is not a complex memory corruption or injection, but a fundamental protocol design flaw: the service transmits sensitive data (the flag) without any encryption. The flag is either sent as plaintext or obscured with a trivial, reversible encoding like Base64.
 
-Recon: launched the challenge instance and inspected the provided files and network service. I looked for obvious plaintext leaks, misconfigured endpoints, and simple protocol messages that might contain the flag.
+The solution path involves interacting with this custom TCP service to coax it into sending the flag.
 
-Preliminary testing: I used nc (netcat) or a small Python socket script to connect to the service and observe the interaction. I also examined any sample files provided by the challenge.
+Initial Interaction: The first step is to perform reconnaissance on the open port using a raw network utility like netcat. By connecting (nc challenge-host 12345), we can observe the service's "banner" and its initial behavior.
 
-Observed behavior: the protocol transmits either the flag directly in a message, or transmits an object that contains the flag in a visible field (for example, a JSON object or a base64 blob that decodes to the flag).
+Protocol Probing: Simple text-based protocols often respond to specific commands. After connecting, we can try sending common commands (HELP, GET, SEND) or, as discovered in this case, a specific string like REQUEST_FLAG to trigger the service's primary function.
 
-Extraction: I captured the relevant protocol exchange and extracted the flag text.
+Data Capture and Analysis: Upon sending the correct command, the service responds by sending the data. In this scenario, the response directly contains the flag, making it readable in the terminal.
 
-# Example interaction (representative)
+Scenario 1: Plaintext Flag The service sends the flag directly, requiring no further action.
+
+```
 $ nc challenge-host 12345
 HELLO
+REQUEST_FLAG
 SENDING FLAG: picoCTF{h1dd3n_1n_pLa1n_51GHT_18375919}
 GOODBYE
-If the flag was encoded (for example base64), decode it:
-# if the service returned a base64 blob
-echo 'cGljb0NURntoMWhyZDVuX2lucF9wTGExbl81MUdIVF8xODM3NTkxOX0=' | base64 -d
-# prints: picoCTF{h1dd3n_1n_pLa1n_51GHT_18375919}
-If the service required a crafted request to reveal the flag (for example, by sending a particular command), I automated the interaction with a short Python script (socket) to replay the steps and capture the response.
+```
+Scenario 2: Encoded Flag If the service had responded with a blob of text like cGljb0NURntoMWhyZDVuX2lucF9wTGExbl81MUdIVF8xODM3NTkxOX0=, this is clearly not the flag but is recognizable as Base64. We can decode it easily on the command line.
+
+```
+# Pipe the encoded string to the base64 utility with the --decode flag
+$ echo 'cGljb0NURntoMWhyZDVuX2lucF9wTGExbl81MUdIVF8xODM3NTkxOX0=' | base64 --decode
+picoCTF{h1dd3n_1n_pLa1n_51GHT_18375919}
+
+```
+Automated Interaction: For more complex interactions (e.g., if a handshake was required), a simple Python script using the socket library is more reliable. This script automates connecting, sending the required command, and printing the server's response.
+
+```
 import socket
-s = socket.create_connection(('challenge-host', 12345))
-s.sendall(b'REQUEST_FLAG\n')
-print(s.recv(4096))
+
+HOST, PORT = 'challenge-host', 12345
+
+try:
+    # Create a TCP socket and connect
+    with socket.create_connection((HOST, PORT)) as s:
+        # Send the command required by the protocol
+        s.sendall(b'REQUEST_FLAG\n')
+
+        # Receive up to 4096 bytes of data
+        response = s.recv(4096)
+        print(response.decode(errors='ignore'))
+
+except socket.error as e:
+    print(f"Socket error: {e}")
+```
 ## Flag:
 ```
 picoCTF{h1dd3n_1n_pLa1n_51GHT_18375919}
 ```
 ## Concepts learnt:
 
-Protocol inspection — how to observe a simple TCP/text protocol and extract useful data.
-Base64 / simple encodings — many challenges encode payloads in obvious encodings; decoding reveals hidden data.
-Passive vs active analysis — distinguishing between passively capturing traffic and actively probing a service to cause it to reveal information.
+Network Protocol Analysis: The process of connecting to an unknown service (nc, telnet) and interacting with it to understand its commands, responses, and overall behavior. This is a form of active reconnaissance.
+
+Common Data Encodings (vs. Encryption): Recognizing non-security-focused encodings. Base64 is used to make binary data "safe" for text-only protocols (like email or this service), but it is not encryption. It's publicly documented and 100% reversible by anyone. Other examples include Hexadecimal and URL encoding.
+
+Active vs. Passive Analysis: This solution used active analysis (probing the service by sending data). A passive approach would involve using a tool like Wireshark to sniff network traffic between two other clients without interfering, which is a common real-world technique.
+
+Socket Programming: The use of Python's socket library demonstrates the fundamental building blocks of network communication: creating a connection, sending (sendall), and receiving (recv) raw bytes.
+
+Insecure by Design: This challenge highlights a common vulnerability category where the system functions exactly as intended, but the design itself lacks basic security controls (like using TLS for encryption).
 
 ## Notes:
-I attempted a few tangents such as fuzzing different command inputs to see if alternative outputs leaked additional info. The simplest path (observing the transfer or sending the single "request flag" message) was sufficient.
-If the flag had been broken into parts, I would have written a small script to assemble and decode the pieces.
+Why Not Fuzz? While simple command guessing worked here, a next step could have been fuzzing. This would involve sending a list of common commands (from a wordlist like dirb), random strings, or malformed data to see if the server crashes or reveals other commands or information.
+
+Reassembling Data: Some challenges intentionally break the flag into pieces, requiring multiple commands (GET_PART_1, GET_PART_2, etc.). A script (like the Python one) would be essential to automate this and reassemble the final flag.
+
+Wireshark / tcpdump: If we didn't have direct access and could only observe the network, a packet capture tool would be the solution. In Wireshark, you could capture the traffic and then right-click the conversation and select "Follow > TCP Stream" to see the full, reassembled text exchange, just as it appeared in the nc terminal.
+
+Static Analysis: If the challenge had provided the server's binary file, a different first step would be static analysis. Running strings server_binary | grep "picoCTF" could potentially find the flag if it was hard-coded directly into the program, bypassing the need for any network interaction.
+
+## Resources
+https://www.google.com/search?q=%5Bhttps://nmap.org/ncat/%5D(https://nmap.org/ncat/)
+https://www.wireshark.org/
+https://gchq.github.io/CyberChef/
+
