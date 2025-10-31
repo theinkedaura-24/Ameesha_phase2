@@ -156,3 +156,4 @@ Ensure you check for zeros in ciphertext (they correspond to ASCII NUL \x00 char
 
 1. https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 2. https://cryptopals.com/
+3. https://www.youtube.com/playlist?list=PLBlnK6fEyqRhBsP45jUdcqBivf25hyVkU
