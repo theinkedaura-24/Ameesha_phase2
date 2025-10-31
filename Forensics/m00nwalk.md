@@ -1,62 +1,70 @@
 # Challenge Description
-The challenge came with a mysterious file called message.wav and a hint that said something about “How did pictures from the moon landing get sent back to Earth?”
-That clue instantly made me think this wasn’t a normal sound file — probably some kind of signal.
+The challenge provided a single audio file, message.wav. A crucial hint was given: “How did pictures from the moon landing get sent back to Earth?” This clue strongly suggested the audio file contained data encoded using a method similar to that used by the Apollo missions, pointing away from simple steganography and toward analog signal encoding.
 
 ## Solution:
-Step 1: Inspecting the file
-I started by simply playing the .wav file.
-Instead of music or speech, I heard a series of strange beeps and tones — kind of like an old modem connecting or Morse code on steroids.
-That convinced me it was some form of encoded data rather than regular audio.
+Step 1: Inspecting the File
+My first action was to play the .wav file. It was immediately clear this was not music or speech. The file contained a series of high-pitched beeps, tones, and screeches, highly reminiscent of an old dial-up modem or a fax machine. This confirmed the audio stream itself was the data.
 
-So I checked the file type and metadata:
+Running file message.wav confirmed it was a standard PCM WAV file, offering no further clues.
 
-file message.wav
-It showed it was a standard PCM WAV file, which didn’t reveal much more.
-The moon hint, though, pushed me toward SSTV (Slow-Scan Television) — the same system used to transmit images from the Apollo missions.
+The "moon landing" hint was the key. This directly points to SSTV (Slow-Scan Television), the very technology used to transmit still images from the Apollo missions over low-bandwidth radio links.
 
-Step 2: Setting up to decode SSTV
-To decode SSTV signals, I used a Linux tool called QSSTV.
-I installed everything I needed with:
+Step 2: Setting up to Decode SSTV
+To decode the signal, I needed an SSTV decoder. On Linux, the standard tool for this is QSSTV. I also needed a way to "play" the audio file into QSSTV as if it were coming from a microphone. This requires setting up a virtual audio loopback.
+
+I installed the necessary software:
 ```
 sudo apt update
 sudo apt install qsstv pavucontrol pulseaudio-utils
 ```
-QSSTV listens to audio input, so I had to make my computer’s audio output loop back into it.
-I did that by creating a virtual audio cable:
+qsstv: The SSTV decoder.
 
+pavucontrol: A graphical mixer for PulseAudio.
+
+pulseaudio-utils: Contains command-line tools (pactl, paplay) to manage audio.
+
+Next, I created the virtual audio "cable" (a null sink):
+
+```
 pactl load-module module-null-sink sink_name=virtual-cable
-This creates a virtual output device called virtual-cable.
-Then I opened pavucontrol (PulseAudio Volume Control) to route the playback of the WAV file into QSSTV:
-
-In the Recording tab, I set QSSTV’s input to Monitor of Null Output (virtual-cable).
-In Playback, I sent the system audio to the virtual-cable output.
-Step 3: Decoding the audio
-With everything wired up, I launched QSSTV:
 ```
+This command creates a virtual output device. Any audio sent to this "virtual-cable" sink can be listened to from its "Monitor" source.
+
+Finally, I used pavucontrol (PulseAudio Volume Control) to route the audio:
+
+Recording Tab: I set qsstv's input source to be "Monitor of Null Output" (which is our virtual-cable).
+
+Playback Tab: I prepared to play the file. (This step can also be done while paplay is running).
+
+Step 3: Decoding the Audio
+With the audio plumbing ready, I launched the decoder:
+
+Bash
+
 qsstv &
-```
-Inside QSSTV, I chose Auto Mode, but remembered the hint about “CMU’s mascot” — which is Scotty the Scottie Dog — so if auto didn’t work, I would try Scottie 1 manually.
+In QSSTV, I set the mode to Auto to let it detect the signal type. (The hint about "CMU's mascot" points to "Scottie the Scottie Dog," so the Scottie 1 mode was my manual backup if Auto failed).
 
-Then I played the file through the virtual cable:
+Then, in a separate terminal, I played the .wav file, explicitly directing its output to the virtual-cable sink:
+
 ```
 paplay -d virtual-cable message.wav
 ```
-After a few seconds, I saw QSSTV start drawing lines slowly on the screen — exactly how SSTV images appear in real time.
-It felt like watching an old transmission come to life line by line.
+Immediately, QSSTV's "waterfall" display lit up, and the main window began slowly rendering an image, line by line, exactly as the audio signal was processed.
 
-Step 4: Extracting the flag
-Once the decoding finished, QSSTV saved the image automatically (you can find it in ~/.qsstv/images).
+Step 4: Extracting the Flag
+After the audio file finished, QSSTV had fully rendered the transmitted image, which was automatically saved (typically in ~/.qsstv/images/).
 
-Opening the image showed a block of text in the middle.
-It looked like Base64, so I copied it:
-```
+The image itself contained a large block of text:
+
 cGljb0NURntiZWVwX2Jvb3BfaW1faW5fc3BhY2V9
-```
-Then I decoded it using:
+This is a classic Base64 string. I copied the text and decoded it on the command line:
+
 ```
 echo -n 'cGljb0NURntiZWVwX2Jvb3BfaW1faW5fc3BhY2V9' | base64 --decode
 ```
-Output:
+(Note: echo -n is important to prevent a trailing newline from being added, which can corrupt the Base64 decoding.)
+
+This command printed the final flag:
 ```
 picoCTF{beep_boop_im_in_space}
 ```
@@ -65,25 +73,31 @@ picoCTF{beep_boop_im_in_space}
 picoCTF{beep_boop_im_in_space}
 ```
 ## Concepts learnt:
-SSTV (Slow-Scan Television):
-SSTV converts images into audio tones so they can be transmitted over radio and then converted back into pictures.
-This is the same technique used by astronauts to send photos from space in the 1960s.
+SSTV (Slow-Scan Television): A method of transmitting still images over low-bandwidth channels (like radio). It works by encoding the image's pixel data as a sequence of audio frequencies.
 
-PulseAudio Virtual Sink:
-I learnt how to create a “fake” audio device that lets you feed audio from one program to another without physical cables.
+Audio Signal Analysis: The ability to recognize that an audio file contains modulated data rather than just sound. This pivots the analysis from steganography to signal processing.
 
-Base64 Encoding:
+PulseAudio Virtual Sink (module-null-sink): A powerful feature of the PulseAudio sound system (common on Linux) that allows for creating "virtual" audio devices. This enables complex audio routing between applications, effectively letting one program "listen" to another program's output.
+
+Multi-stage Decoding: A common CTF pattern where solving one part of the puzzle (decoding the SSTV) reveals another layer of encoding (Base64) that must also be solved.
+
+Base64 Encoding: A standard for encoding binary data into a text-only (ASCII) format. It's not encryption, but a way to ensure data remains intact when transmitted over text-based protocols.
 Even after decoding the image, the text itself was Base64, so a simple decoding step gave the final flag.
 
 ## Notes:
-Initially, I tried basic steganography tools like binwalk and strings thinking there might be hidden data directly in the audio file. That didn’t reveal anything useful.
-Only after replaying the audio did I realize it was modulated data.
+Initial Failed Tangents: My first instinct was to use digital steganography tools like steghide or analyze the file with strings or binwalk. This failed because the data was not hidden in the audio's metadata or LSB (Least Significant Bit); the audio was the data.
 
-If QSSTV doesn’t decode properly, check that the input is really the virtual-cable monitor, or try different SSTV modes (Scottie 1 or Martin 1 usually work).
+Spectrograms: If the SSTV hint wasn't as obvious, the next step would have been to open the file in a spectrogram viewer like Audacity or Sonic Visualiser. A spectrogram plots frequency vs. time and would have visually revealed the structured, non-random patterns of the SSTV signal.
 
-After finishing, you can unload the virtual sink with:
+Alternative Tools: While qsstv is excellent, gqrx (an SDR tool) or even mobile apps (e.g., "Robot36" on Android, "SSTV Slow Scan TV" on iOS) can also decode SSTV if you play the sound from your computer's speaker into your phone's microphone.
 
+System Cleanup: After finishing, you can unload the virtual sink to return your audio system to its normal state with:
+
+```
 pactl unload-module module-null-sink
+```
 
 ## Resources:
-HackMD write-up reference (used for verifying commands)
+1. http://users.telenet.be/on4qz/qsstv/index.html
+2. https://www.audacityteam.org/
+3. http://www.arrl.org/slow-scan-television
