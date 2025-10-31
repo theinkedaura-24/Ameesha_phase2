@@ -154,13 +154,13 @@ MSB vs. LSB: Our script implicitly assumes the data is sent Most Significant Bit
 The Hint File: The challenge.txt file contained À LFj1iPV Hc9. This appears to be a snippet of the data stream, mis-decoded (e.g., with the wrong bit order or a sampling error), which served as a hint that we were on the right track.
 
 ## Resources
-Saleae Logic 2 Software: The (free) software used to analyze .sal capture files. https://www.saleae.com/downloads/
+https://www.saleae.com/downloads/
 
-Sigrok/PulseView: A popular open-source alternative to the Saleae software that can also analyze logic captures. https://sigrok.org/wiki/PulseView
+https://sigrok.org/wiki/PulseView
 
-SparkFun: SPI Protocol: An excellent, clear tutorial on the fundamentals of the Serial Peripheral Interface (SPI). https://learn.sparkfun.com/tutorials/serial-peripheral-interface-spi
+https://learn.sparkfun.com/tutorials/serial-peripheral-interface-spi
 
-NumPy unpackbits Documentation: The official documentation for the key function used to convert packed bytes into a bit array. https://numpy.org/doc/stable/reference/generated/numpy.unpackbits.html
+
 
 
 
