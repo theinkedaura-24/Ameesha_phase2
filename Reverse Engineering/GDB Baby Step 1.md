@@ -1,4 +1,4 @@
-# 1. GDB Baby Step 1
+# GDB Baby Step 1
 This challenge is an executable file and our task is to do Reverse Engineering on it using GDB and find out the value contained in the EAX register at the end of the main function.
 
 ## Solution:
