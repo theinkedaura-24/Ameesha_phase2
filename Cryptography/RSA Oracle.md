@@ -14,95 +14,36 @@ nc titan.picoctf.net 54779
 
 the server prints:
 
-*****************************************
-****************THE ORACLE***************
-*****************************************
-what should we do for you? 
-E --> encrypt D --> decrypt.
-
-
-Choosing E allows us to encrypt a number, while D allows us to decrypt one.
-
-Example:
-
-E
-enter text to encrypt (encoded length must be less than keysize): 1
-1
-encoded cleartext as Hex m: 31
-ciphertext (m ^ e mod n): 4374671741411819653095065203638363839705760144524191633605358134684143978321095859047126585649272872908765432040943055399247499744070371810470682366100689
-
-
-Recovering the Modulus N
-
-RSA encryption works as:
-
-c = m^e mod N
-
-
-If we can query encryptions for different m values, we can compute differences that share the same modulus. The following function helps recover N:
-
-def recover_n(pairings, e):
-    pt1, ct1 = pairings[0]
-    N = ct1 - pow(pt1, e)
-    for pt, ct in pairings:
-        val = gmpy2.mpz(ct - pow(pt, e))
-        N = gmpy2.gcd(val, N)
-    return N
-```
-
-This leverages the property that ct - m^e is always a multiple of N. By taking GCDs across multiple encryptions, we can determine the modulus.
-
-In our case, using encryptions for 1 and 2, we derived the modulus N ≈ 5507598452356422225755194020880876452588463543445995226287547479009566151786764261801368190219042978883834809435145954028371516656752643743433517325277971.
-
-Validating N
-
-Checking the RSA operation:
-
-pow(0x30, 65537, N)
-
-
-yielded the same ciphertext seen earlier, confirming that our recovered N is correct.
-
-Chosen-Ciphertext Attack (CCA)
-
-Using the RSHack tool
- (modified for Python 3), I implemented the following logic:
-
-c_bis = c * pow(2, e, n) % n
-# send c_bis to oracle
-# receive out = oracle_decrypt(c_bis)
-p = out // 2
-
-
-This approach works because RSA is multiplicatively homomorphic, meaning:
-
-```
-decrypt(c * 2^e mod N) = (m * 2) mod N
-```
-
-Dividing by 2 retrieves the original plaintext.
-
-Oracle Interaction
-
-Using the oracle:
-```
-
-ameesha_goel@DESKTOP-7U7A055:~$ nc titan.picoctf.net 54779
+First I inputted 2, and the oracle gave out:
+***************
+*****THE ORACLE******
+***************
+what should we do for you?
 E --> encrypt D --> decrypt.
 e
 enter text to encrypt (encoded length must be less than keysize): 2
-ciphertext: 4707619883686427763240856106433203231481313994680729548861877810439954027216515481620077982254465432294427487895036699854948548980054737181231034760249505
-```
+2
 
+encoded cleartext as Hex m: 32
 
-Then for decryption:
-```
-D
-Enter text to decrypt: 16793269912070937844635095856519609843106938056844271635016672556411657824199338170936774923657169812744088290168486013857835787244752509092427180236594146403102972184218115898930702635526307598755278072389812742237902783893341521177857386971678423157530556886739554966046062248096265748880803311155569188515
-decrypted ciphertext as hex (c ^ d mod n): 9ffff9d3556
-```
+ciphertext (m ^ e mod n) 4707619883686427763240856106433203231481313994680729548861877810439954027216515481620077982254465432294427487895036699854948548980054737181231034760249505
 
-Unfortunately, the result 9ffff9d3556 did not decode into any readable ASCII or valid password.
+ameesha_goel@DESKTOP-7U7A055:~$ cd /mnt/c/Users/admin/Downloads
+
+ameesha_goel@DESKTOP-7U7A055:/mnt/c/Users/admin/Downloads$ cat password.enc
+
+3567252736412634555920569398403787395170577668834666742330267390011828943495692402033350307843527370186546259265692029368644049938630024394169760506488003
+
+Then I used python script the multiply both encrypted texts :
+a = 4707619883686427763240856106433203231481313994680729548861877810439954027216515481620077982254465432294427487895036699854948548980054737181231034760249505
+b = 3567252736412634555920569398403787395170577668834666742330267390011828943495692402033350307843527370186546259265692029368644049938630024394169760506488003
+
+result = a * b
+print(result)
+This gave me another encrypted output: 16793269912070937844635095856519609843106938056844271635016672556411657824199338170936774923657169812744088290168486013857835787244752509092427180236594146403102972184218115898930702635526307598755278072389812742237902783893341521177857386971678423157530556886739554966046062248096265748880803311155569188515
+I used the oracle again to decrypt this and got 9ffff9d3556
+
+which was unusual since I was supposed to get a decrypted number from this.
 
 ## Analysis
 
@@ -200,6 +141,9 @@ Leading zero loss: If a recovered hex string has odd length, you must pad it wit
 https://sudorem.dev/posts/pico24-rsa-oracle/
 https://youtu.be/XsiwqgGourA?si=6dI8ga5mQT0CNnLk
 https://youtu.be/-ShwJqAalOk?si=L9kWl4RqeCG2rTyz
+https://www.encryptionconsulting.com/education-center/what-is-rsa/
+https://www.tutorialspoint.com/cryptography/cryptography_rsa_algorithm.htm
+
 
 
 
