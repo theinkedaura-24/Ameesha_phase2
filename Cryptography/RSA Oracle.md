@@ -44,6 +44,7 @@ This gave me another encrypted output: 16793269912070937844635095856519609843106
 I used the oracle again to decrypt this and got 9ffff9d3556
 
 which was unusual since I was supposed to get a decrypted number from this.
+```
 
 ## Analysis
 
