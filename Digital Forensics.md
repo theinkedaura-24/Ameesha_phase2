@@ -309,12 +309,145 @@ Highlights importance of keeping challenge files together or knowing file locati
 
 Could also have solved using Wireshark and Follow → ICMP Stream, but plaintext string extraction was quicker.
 
-Resources:
-
-https://www.wireshark.org/
+## Resources:
 
 https://www.7-zip.org/
 
 https://www.regular-expressions.info/
 
 https://ctf101.org/forensics/overview/
+
+***
+# NineTails
+
+Looks like I got a little too clever and hid the flag as a password in Firefox, tucked away like one of NineTails’ many tails. Recover the logins and the key4 and let it guide you to the flag.
+Hint: I named my Ninetails j4gjesg4, quite a peculiar name isn't it?
+
+## Solution
+
+The downloadable file provided in the challenge was a large .rar archive, and after extracting it, I received a forensic disk image .ad1 file.
+
+.ad1 is an AccessData forensic image format, typically used for disk recovery and digital forensics. It needs to be opened with a forensic tool like FTK Imager.
+
+The challenge description hinted at Firefox passwords stored in the system: specifically logins.json and key4.db files, which are normally stored inside a Firefox profile directory.
+
+
+1. Extract and mount the AD1 image
+
+I opened the .ad1 file using FTK Imager:
+
+Open FTK Imager
+Navigate to File → Add Evidence Item
+Select Image File
+Choose the provided ninetails.ad1 file
+Once loaded, FTK Imager allowed us to cleanly browse the filesystem contained inside the disk image.
+
+Then I navigated through the evidence tree and located:
+
+Users → <user> → AppData → Roaming → Mozilla → Firefox → Profiles
+
+Inside this directory, I found a suspicious profile folder:
+
+j4gjesg4.default-release
+
+
+which matched the challenge hint.
+
+<img width="1902" height="1108" alt="image" src="https://github.com/user-attachments/assets/8631ef48-4e20-4b7d-ac25-f862828a0089" />
+
+
+I exported the entire folder:
+
+Right-click → Export Files → saved to /Downloads
+
+[Screenshot-3: Export folder menu]
+
+2. Decrypt Firefox Saved Passwords
+
+Since Firefox stores encrypted passwords in:
+
+logins.json
+key4.db
+
+
+I needed to decrypt them using Ubuntu (WSL).
+
+First installed required dependencies:
+```
+
+sudo apt update
+sudo apt install python3 python3-pip sqlite3 git
+pip3 install pycryptodomex
+
+```
+Then cloned the decryption tool:
+```
+git clone https://github.com/unode/firefox_decrypt.git
+cd firefox_decrypt
+```
+
+Finally, ran the script against the exported Firefox profile:
+```
+python3 firefox_decrypt.py /mnt/c/Users/admin/Downloads/j4gjesg4.default-release/
+```
+Terminal Output
+```
+ameesha_goel@DESKTOP-7U7A055:~/firefox_decrypt$ python3 firefox_decrypt.py /mnt/c/Users/admin/Downloads/j4gjesg4.default-release/
+2025-12-01 02:16:03,001 - WARNING - profile.ini not found in /mnt/c/Users/admin/Downloads/j4gjesg4.default-release/
+2025-12-01 02:16:03,001 - WARNING - Continuing and assuming '/mnt/c/Users/admin/Downloads/j4gjesg4.default-release/' is a profile location
+
+Website:   https://www.rehack.xyz
+Username: 'warlocksmurf'
+Password: 'GCTF{m0zarella'
+
+Website:   https://ctftime.org
+Username: 'ilovecheese'
+Password: 'CHEEEEEEEEEEEEEEEEEEEEEEEEEESE'
+
+Website:   https://www.reddit.com
+Username: 'bluelobster'
+Password: '_f1ref0x_'
+
+Website:   https://www.facebook.com
+Username: 'flag'
+Password: 'SIKE'
+
+Website:   https://warlocksmurf.github.io
+Username: 'Man I Love Forensics'
+Password: 'p4ssw0rd}'
+```
+
+The flag was split across accounts, requiring reconstruction from fragments.
+
+## Flag
+```
+GCTF{m0zarella_p4ssw0rd}
+```
+## Concepts learnt
+
+Digital Forensics	Working with forensic disk images such as .ad1
+FTK Imager	A forensic tool used to mount and extract files from disk images
+Firefox Password Storage	Firefox uses logins.json and key4.db along with certificates (cert9.db)
+NSS (Network Security Services)	Backend used to encrypt and decrypt password store
+Password Decryption	Using python tools like firefox_decrypt.py
+
+## Notes
+
+I initially extracted only logins.json and key4.db individually, but the script failed with:
+
+ERROR - Couldn't initialize NSS, maybe this is not a valid profile
+
+Learned that the script requires the entire Firefox profile directory because it also needs cert9.db to reconstruct keys.
+
+The password fragments misleadingly looked like different login credentials until I recognized they formed a valid CTF flag format.
+
+## Resources
+
+https://www.exterro.com/digital-forensics-software/ftk-imager-pro
+
+https://github.com/unode/firefox_decrypt
+
+Wireshark
+
+https://support.mozilla.org/en-US/kb/profiles-where-firefox-stores-user-data
+
