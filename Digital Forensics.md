@@ -426,9 +426,13 @@ GCTF{m0zarella_p4ssw0rd}
 ## Concepts learnt
 
 Digital Forensics	Working with forensic disk images such as .ad1
+
 FTK Imager	A forensic tool used to mount and extract files from disk images
+
 Firefox Password Storage	Firefox uses logins.json and key4.db along with certificates (cert9.db)
+
 NSS (Network Security Services)	Backend used to encrypt and decrypt password store
+
 Password Decryption	Using python tools like firefox_decrypt.py
 
 ## Notes
