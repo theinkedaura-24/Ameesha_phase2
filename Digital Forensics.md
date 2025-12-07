@@ -71,3 +71,129 @@ I mistakenly tried to verify the output file with file sa kamoto.jpg.out initial
 ## Resources:
 
 https://github.com/RickdeJager/stegseek
+
+***
+
+# Nutrela Chunks
+
+One of my favorite foods is soya chunks. But as I was enjoying some Nutrela today, I noticed a few chunks weren’t quite right. Seems like something’s off with their structure. Could you help me fix these broken chunks so I can enjoy my meal again?
+
+## Solution:
+
+A PNG file was provided but wouldn’t open, suggesting file structure corruption.
+
+The challenge hint said "broken chunks", referring to PNG chunk metadata.
+
+1. Checking the file
+```
+file nutrela.png
+xxd -l 128 nutrela.png
+```
+
+Issue 1: Wrong PNG signature
+p n g instead of PNG
+
+```
+cp nutrela.png fixed.png
+echo "00000001: 50 4E 47" > patch.txt
+xxd -r - fixed.png < patch.txt
+```
+
+2. Checking chunks
+```
+pngcheck -v fixed.png
+```
+
+Issue 2: IHDR was lowercase (ihdr)
+So we patched it:
+
+```
+echo "0000000C: 49 48 44 52" > fixhdr.patch
+xxd -r - fixed.png < fixhdr.patch
+```
+
+3. Patch IDAT chunk name
+```
+echo "00000025: 49 44 41 54" > idat.patch
+xxd -r idat.patch final.png
+```
+
+4. Patch IEND chunk at correct offset
+
+Found via:
+```
+xxd -s 0x83810 -l 64 final.png
+
+```
+Patched:
+```
+echo "0008381E: 49 45 4E 44" > proper_iend.patch
+echo "00083822: AE 42 60 82" >> proper_iend.patch
+cp final.png solved.png
+xxd -r proper_iend.patch solved.png
+```
+
+5. Final Check
+pngcheck -v solved.png
+
+
+Output:
+
+No errors detected in solved.png
+
+
+Result: A valid PNG again 
+
+Final Image (Flag inside)
+
+<img width="1000" height="1000" alt="solved" src="https://github.com/user-attachments/assets/4272110b-1521-4d91-a914-366466f2037e" />
+
+
+
+## Flag:
+```
+nite{n0w_y0u_kn0w_ab0ut_PNG_chunk5}
+```
+
+## Concepts learnt:
+
+1. PNG File Structure
+
+->Signature
+
+->Chunks (IHDR, IDAT, IEND)
+
+->Chunk format: Length | Type | Data | CRC
+
+2. Hex editing
+
+->Using xxd to patch binary files
+
+3. File magic bytes (headers)
+
+4. pngcheck for validation
+
+5. How case sensitivity matters in chunk types
+
+6. Debugging corrupted metadata
+
+## Notes:
+
+1. Initially tried removing random bytes that unfortunately broke file further 
+
+2. Learned that this CTF intentionally corrupted uppercase chunk names
+
+3. Important lesson: always inspect the actual layout via hex before patching
+
+4. Used sequential validation after each fix
+
+## Resources:
+
+PNG File Structure Reference
+https://www.w3.org/TR/2003/REC-PNG-20031110
+
+xxd usage guide
+https://linux.die.net/man/1/xxd
+
+pngcheck utility
+http://www.libpng.org/pub/png/apps/pngcheck.html
