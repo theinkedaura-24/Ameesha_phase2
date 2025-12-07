@@ -197,3 +197,124 @@ https://linux.die.net/man/1/xxd
 
 pngcheck utility
 http://www.libpng.org/pub/png/apps/pngcheck.html
+
+***
+
+# RAR of the Abyss
+
+Two philosophers peer into the networked abyss and swap a secret. Use the secret to decrypt the Abyss’ RAwR and pull your flag from the void.
+
+## Solution:
+Step 1 — Understanding the Challenge
+
+We are provided with a file named abyss.pcap
+
+The challenge description hints at philosophers (Camus & Nietzsche) and the word "secret", implying hidden communication in a network capture.
+
+.pcap files generally contain packet captures — best opened in tools like Wireshark or using scripting to extract textual content.
+
+Step 2 — Extracting Strings From PCAP
+
+My initial approach was to extract all readable strings from the binary .pcap file to see if any human chat or credentials appear.
+
+Since I was using IDLE and the file path wasn’t in the same directory initially, I wrote a Python script that asks for file path input to avoid directory confusion.
+```
+
+import re
+
+# Ask the user for the full file path
+filepath = input("Enter the full path of the pcap file: ")
+
+try:
+    # Read file in binary mode
+    with open(filepath, "rb") as file:
+        data = file.read()
+
+    # Find printable ASCII strings
+    strings = re.findall(rb"[ -~]{6,}", data)
+
+    print("\nExtracted Text Strings:\n")
+    for s in strings:
+        try:
+            print(s.decode())
+        except:
+            pass
+
+except FileNotFoundError:
+    print("\nError: File not found. Please check the path and try again.")
+except Exception as e:
+    print("\nAn error occurred:", e)
+
+Output
+Camus: One must imagine Sisyphus happy but are we happy ?
+Nietzsche: You will be happy after reading my latest work
+Camus: whats the password ?
+Nietzsche: b3y0ndG00dand3vil
+Camus: thanks
+```
+
+Observation
+
+The philosophers’ clue from the description appears directly in this output and one line clearly contains a password:
+```
+b3y0ndG00dand3vil
+```
+
+Step 3 — Using the Password
+
+After extracting the password, I checked the provided challenge files and found a compressed archive inside the same package.
+
+I used 7-Zip and attempted to extract it. It prompted for a password — I entered the one retrieved from the pcap conversation:
+```
+b3y0ndG00dand3vil
+```
+
+Extraction succeeded and produced a flag.txt file.
+
+Step 4 — Getting the Flag
+
+Opening flag.txt revealed:
+```
+nite{thus_sp0k3_th3_n3tw0rk_f0r3ns1cs_4n4lyst}
+```
+## Flag:
+```
+nite{thus_sp0k3_th3_n3tw0rk_f0r3ns1cs_4n4lyst}
+```
+## Concepts Learnt:
+
+Network Forensics — analyzing packet captures for hidden communication.
+
+PCAP analysis basics
+
+->Strings extraction from binary using regex and scripting
+
+->Understanding common protocols (ICMP, SSDP, DNS)
+
+Using Python for DFIR (Digital Forensics Incident Response)
+
+Identifying hidden messages disguised as normal network traffic
+
+Password-protected archives in CTFs
+
+7-Zip extraction using discovered credentials
+
+## Notes:
+
+Initially, the script printed itself because I accidentally executed it while the .pcap was in a different folder, so Python opened the script file instead of the pcap.
+
+Solved by switching to a version that accepts file-path input.
+
+Highlights importance of keeping challenge files together or knowing file location handling in Python.
+
+Could also have solved using Wireshark and Follow → ICMP Stream, but plaintext string extraction was quicker.
+
+Resources:
+
+https://www.wireshark.org/
+
+https://www.7-zip.org/
+
+https://www.regular-expressions.info/
+
+https://ctf101.org/forensics/overview/
