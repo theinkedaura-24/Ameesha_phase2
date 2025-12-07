@@ -455,3 +455,219 @@ Wireshark
 
 https://support.mozilla.org/en-US/kb/profiles-where-firefox-stores-user-data
 
+***
+## Redraw
+
+Her screen went black and a strange command window flickered to life. Moments later the system crashed.
+By sheer luck, a memory dump was recovered.
+There are three flags, each hidden in a different part of RAM.
+Use Volatility 2 plugins to uncover command output, MSPaint artifacts, and a hidden archive deep in memory.
+
+# Solution:
+
+This challenge used a Windows 7 memory dump and required using Volatility 2 to extract evidence of:
+
+a mysterious command window (Flag 1)
+
+remnants of a MSPaint drawing (Flag 2)
+
+a hidden RAR archive (Flag 3)
+
+Identify Image Profile
+
+Before using Volatility, we identify the correct profile:
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw imageinfo
+```
+
+This returns:
+```
+Suggested Profile(s) : Win7SP1x64, Win7SP0x64, Win2008R2SP0x64...
+Image date and time : 2019-12-11 14:38:00 UTC+0000
+```
+
+We select:
+```
+--profile=Win7SP1x64
+```
+Part 1 – Retrieving the Command Window Output (FLAG 1)
+
+The description hinted that a black command window flashed before the crash.
+
+Step 1: Identify running processes
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 pslist
+```
+
+This confirms a cmd.exe process:
+```
+cmd.exe                1984
+conhost.exe            2692
+```
+Step 2: Extract command history using consoles
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 consoles
+```
+
+This shows:
+```
+Cmd #0: St4G3$1
+ZmxhZ3t0aDFzXzFzX3RoM18xc3Rfc3Q0ZzMhIX0=
+```
+
+This Base64 string decodes to:
+```
+flag{th1s_1s_th3_1st_st4g3!!}
+```
+Part 2 – Recovering MSPaint Canvas (FLAG 2)
+
+The challenge description states “she was drawing when it happened.”
+
+We confirm MSPaint was running:
+```
+mspaint.exe  2424
+```
+Step 1: Dump MSPaint process memory
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 memdump -p 2424 -D ./output
+```
+
+This produces:
+```
+Writing mspaint.exe [2424] to 2424.dmp
+```
+Step 2: The MSPaint canvas is raw pixel data, not a PNG/JPG
+
+Foremost does NOT help here.
+
+Instead, open the dump in GIMP → Import as Raw Data.
+
+File → Open → select 2424.dmp
+
+Choose “Open as Raw”
+
+Experiment with
+
+RGB
+
+24–32 bits per pixel
+
+Little endian
+
+Width ≈ 1000–2000 px
+
+At first the canvas appears slanted
+
+After rotating 180° and flipping vertically
+
+<img width="732" height="153" alt="image" src="https://github.com/user-attachments/assets/7af20ae0-04e2-4a84-9ae7-923dc554a33a" />
+
+We recover the hidden text:
+
+flag{G00d_BoY_good_girL}
+
+Part 3 – Recovering the Hidden RAR Archive (FLAG 3)
+
+The hint mentioned “a mysterious archive hiding deeper in memory.”
+
+Step 1: Search memory for RAR files
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 filescan | grep -E '\.rar'
+```
+
+This gives:
+
+Important.rar
+
+Step 2: Dump the file using its physical offset
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 dumpfiles -Q <offset> -D ./output
+```
+
+The dumped file has .dat extension — rename it:
+
+mv file.dat Important.rar
+
+Step 3: Tried extracting
+```
+unrar e Important.rar
+```
+
+Output:
+
+Password is NTLM hash of Alissa's account passwd.
+
+Step 4: Retrieve NTLM hashes
+```
+./volatility_2.6_lin64_standalone -f MemoryDump_Lab1.raw --profile=Win7SP1x64 hashdump
+
+```
+This shows:
+```
+Alissa Simpson:1003:...:F4FF64C8BAAC57D22F22EDC681055BA6:::
+```
+
+Using that hash as password:
+
+F4FF64C8BAAC57D22F22EDC681055BA6
+
+
+Extracting yields:
+
+flag3.png
+<img width="500" height="500" alt="image" src="https://github.com/user-attachments/assets/21251b05-2200-4d14-a563-236721eb5200" />
+
+
+Opening the PNG:
+
+flag{w3ll_3rd_stage_was_easy}
+
+## Flags:
+```
+flag{th1s_1s_th3_1st_st4g3!!}
+flag{G00d_BoY_good_girL}
+flag{w3ll_3rd_stage_was_easy}
+```
+## Concepts learnt:
+
+Volatility 2 usage
+Profiles, memdump, filescan, consoles, hashdump
+
+Memory forensics basics
+RAM contains: screen buffers, clipboard, command history, pixel data, documents, passwords
+
+Raw image reconstruction
+Viewing raw framebuffer data with GIMP to recover MSPaint drawings
+
+NTLM hashes usage
+Windows stores user credentials as NTLM hashes → usable as passwords for encrypted content
+
+RAR memory extraction
+How to reconstruct file objects stored only in RAM
+
+## Notes:
+
+I initially delved into procdump and got highly confused so wasted time, should have instead gone to memdump.
+
+Foremost extracted unrelated images — MSPaint canvas is RAW, not BMP
+
+The slanted image in GIMP was confusing until rotated and flipped
+
+Multiple RAR offsets existed but they all pointed to the same file
+
+The challenge significantly improved my Volatility workflow
+
+## Resources:
+
+Volatility 2 Documentation
+
+https://github.com/volatilityfoundation/volatility/wiki
+
+Articles on Windows memory forensics
+
+Tutorials on GIMP “Import RAW” feature
+
+NTLM hash cracking references
+
+DumpIt documentation
+
