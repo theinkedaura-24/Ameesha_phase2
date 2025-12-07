@@ -455,3 +455,175 @@ I had to be careful with the XOR loop order; solving for Key[i] required knowing
 https://en.wikipedia.org/wiki/List_of_file_signatures
 
 https://wiki.python.org/moin/BitwiseOperators
+
+***
+# Willy's Chocolate Experience
+
+The Oompa Loompas have been at work making your ticket into candy. However, someone stole a few candies and we only have the leftovers.
+
+Can you get back your ticket?
+
+## Solution
+
+Step 1: Analyzing the Source CodeThe challenge provides a Python script that implements a custom function imagination_lab(m).
+
+Mathematically, the function is:$$f(m) = 13^m + 37^m \pmod p$$
+
+We are given the last two values in a sequence, leftover, which correspond to:
+
+$y_1 = f(\text{ticket} - 1)$$y_2 = f(\text{ticket})$
+
+Our goal is to recover the input ticket.
+
+Step 2: Linear Algebra Attack
+
+Let $x = \text{ticket} - 1$. 
+
+The system of equations is:
+
+$$y_1 \equiv 13^x + 37^x \pmod p$$
+
+$$y_2 \equiv 13^{x+1} + 37^{x+1} \pmod p$$
+
+Since $13^{x+1} = 13 \cdot 13^x$, we can treat $13^x$ and $37^x$ as variables $A$ and $B$.
+
+$$A + B \equiv y_1$$$$13A + 37B \equiv y_2$$
+
+We can eliminate $A$ (the $13^x$ term) to solve for $B$ (the $37^x$ term):
+
+Multiply the first equation by 13:
+
+$$13A + 13B \equiv 13y_1$$
+
+Subtract this from the second equation:
+
+$$(13A + 37B) - (13A + 13B) \equiv y_2 - 13y_1$$
+
+$$24B \equiv y_2 - 13y_1$$
+
+So, we can recover the value of $37^x$:
+
+$$37^x \equiv (y_2 - 13y_1) \cdot 24^{-1} \pmod p$$
+
+Step 3: Discrete Logarithm Analysis
+
+We now have an equation of the form 
+
+$g^x \equiv h \pmod p$, where $g=37$. 
+
+This is the Discrete Logarithm Problem (DLP).
+
+Usually, this is hard to solve. 
+
+However, we check the properties of $p-1$ (the order of the multiplicative group).
+
+Using a factoring tool or script, we see that $p-1$ is smooth (composed entirely of small prime factors). This makes it vulnerable to the Pohlig-Hellman attack.
+
+Step 4: Solving with Pohlig-Hellman
+
+I wrote a solver script that:Calculates the target value $B = 37^x$.
+
+Factors $p-1$ (pre-calculated in the script for speed).
+
+Uses the Pohlig-Hellman algorithm:
+
+It solves the discrete log modulo each small prime factor $q$ using the Baby-step Giant-step (BSGS) algorithm.
+
+It combines these partial results using the Chinese Remainder Theorem (CRT) to recover the full $x$.
+
+Note: I encountered a bug where the factor 2 produced a degenerate case (base became 1), causing incorrect results. I added a check to skip any factor where the base becomes 1.
+
+Solver Script
+
+```
+from Crypto.Util.number import long_to_bytes, inverse
+
+# --- Helper Functions ---
+
+def bsgs(g, h, p, order):
+    """ Baby-step Giant-step algorithm """
+    m = int(order**0.5) + 1
+    table = {pow(g, j, p): j for j in range(m)}
+    factor = pow(g, -m, p)
+    cur = h
+    for i in range(m):
+        if cur in table:
+            return i * m + table[cur]
+        cur = (cur * factor) % p
+    return None
+
+def chinese_remainder_theorem(moduli, residues):
+    """ Reconstructs x from residues using CRT """
+    M = 1
+    for m in moduli: M *= m
+    result = 0
+    for m, r in zip(moduli, residues):
+        Mi = M // m
+        result += r * Mi * inverse(Mi, m)
+    return result % M
+
+# --- Challenge Data ---
+p = 396430433566694153228963024068183195900644000015629930982017434859080008533624204265038366113052353086248115602503012179807206251960510130759852727353283868788493357310003786807
+leftover = [124499652441066069321544812234595327614165778598236394255418354986873240978090206863399216810942232360879573073405796848165530765886142184827326462551698684564407582751560255175, 208271276785711416565270003674719254652567820785459096303084135643866107254120926647956533028404502637100461134874329585833364948354858925270600245218260166855547105655294503224]
+
+# --- Execution ---
+print("1. Recovering 37^x from linear equations...")
+y1, y2 = leftover
+B = ((y2 - 13 * y1) * inverse(24, p)) % p
+
+print("2. Solving Discrete Logarithm (Pohlig-Hellman)...")
+# Factors of p-1
+factors = {2: 1, 530897: 1, 550513: 1, 578483: 1, 579757: 1, 596977: 1, 605837: 1, 606173: 1, 608389: 1, 631483: 1, 632501: 1, 663907: 1, 674357: 1, 742607: 1, 749051: 1, 763597: 1, 790817: 1, 813797: 1, 824683: 1, 832291: 1, 845753: 1, 856343: 1, 880531: 1, 885061: 1, 899177: 1, 899321: 1, 942187: 1, 972637: 1, 1014149: 1, 1031347: 1, 1032901: 1}
+
+moduli, residues = [], []
+
+for q in factors:
+    sub_order = (p - 1) // q
+    g_prime = pow(37, sub_order, p)
+    h_prime = pow(B, sub_order, p)
+    
+    # Skip degenerate cases (where base becomes 1)
+    if g_prime == 1: continue
+
+    x_i = bsgs(g_prime, h_prime, p, q)
+    if x_i is not None:
+        moduli.append(q)
+        residues.append(x_i)
+
+x = chinese_remainder_theorem(moduli, residues)
+ticket = x + 1
+
+print(f"3. Ticket found: {ticket}")
+print(f"Flag: {long_to_bytes(ticket).decode()}")
+
+```
+## Flag
+
+```
+nite{g0ld3n_t1ck3t_t0_gl4sg0w}
+
+```
+
+## Concepts learned
+
+Pohlig-Hellman Algorithm: A powerful attack against the Discrete Logarithm Problem when the order of the group ($p-1$) is "smooth" (has only small prime factors).
+
+Smooth Numbers: Numbers that factor completely into small prime numbers. In CTF cryptography, checking p-1 for smoothness is a standard first step.
+
+Linear Algebra in Cryptography: Using systems of equations to isolate exponentiated terms ($A^x$) when given sums of them.
+
+## Notes:
+
+Initial Failure: My first attempt failed with a UnicodeDecodeError and a garbage large integer. This happened because for the factor 2, the base $37^{(p-1)/2}$ resulted in 1. This meant $1^x = 1$, which is always true regardless of $x$, causing the solver to return 0 for that modulus.
+
+Fix: I modified the script to check if g_prime == 1: continue. This skipped the degenerate factor 2 and allowed the Chinese Remainder Theorem to reconstruct the correct ticket using the remaining factors.
+
+Environment: I had to install pycryptodome on Windows using pip install pycryptodome to get the script running.
+
+## Resources
+
+https://en.wikipedia.org/wiki/Discrete_logarithm
+
+Pollig Hellman Theorem
+
+https://www.pycryptodome.org/
