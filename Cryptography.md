@@ -113,11 +113,11 @@ b'nite{r3s1du35_f4ll1ng_1nt0_pl4c3}'
 b'nite{r3s1du35_f4ll1ng_1nt0_pl4c3}'
 ```
 ## Concepts learnt:
-Quadratic Residues: Integers x such that x=q^2 (mod p).
+Quadratic Residues: Integers $x$ such that $x \equiv q^2 \pmod p$.
 
-Legendre Symbol: A function (a/p) that determines if $a$ is a quadratic residue modulo p. It returns 1 for QR, -1 for QNR, and 0 if a divides p.
+Legendre Symbol: A function $(\frac{a}{p})$ that determines if $a$ is a quadratic residue modulo $p$. 
 
-Euler's Criterion: The formula $a^{(p-1)/2} \equiv (\frac{a}{p}) \pmod p$ used to calculate the Legendre symbol.
+It returns 1 for QR, -1 for QNR, and 0 if $a$ divides $p$.Euler's Criterion: The formula $a^{(p-1)/2} \equiv (\frac{a}{p}) \pmod p$ used to calculate the Legendre symbol.
 
 Multiplicative Properties: Understanding that multiplying a Quadratic Residue by a Quadratic Non-Residue results in a Non-Residue.
 
