@@ -779,6 +779,7 @@ def solve():
 if __name__ == '__main__':
     solve()
 ```
+<img width="1046" height="944" alt="image" src="https://github.com/user-attachments/assets/31088cfd-b7bb-4610-ac0e-555421857e18" />
 
 ## Flag
 ```
