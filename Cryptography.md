@@ -37,9 +37,9 @@ If bit is '1': Appends (a * QNR) % p
 
 The variable a is a random integer constant for the entire session. We don't know if a itself is a QR or QNR, but it affects the output:
 
-Case 1 (a is QR): Bit '0' $\rightarrow$ $QR \times QR = \mathbf{QR}$Bit '1' $\rightarrow$ $QR \times QNR = \mathbf{QNR}$
+Case 1 (a is QR): Bit '0' $\rightarrow$ QR X QR = \mathbf{QR}$Bit '1' $\rightarrow$ $QR \times QNR = \mathbf{QNR}$
 
-Case 2 (a is QNR):Bit '0' $\rightarrow$ $QNR \times QR = \mathbf{QNR}$Bit '1' $\rightarrow$ $QNR \times QNR = \mathbf{QR}$
+Case 2 (a is QNR):Bit '0' $\rightarrow$ QNR X QR = \mathbf{QNR}$Bit '1' $\rightarrow$ $QNR \times QNR = \mathbf{QR}$
 
 Step 4: Writing the Solver
 
