@@ -627,3 +627,182 @@ https://en.wikipedia.org/wiki/Discrete_logarithm
 Pollig Hellman Theorem
 
 https://www.pycryptodome.org/
+
+***
+
+## SPAES Oddity
+
+A cryptographic challenge involving AES ECB encryption. The server allows you to input a message, appends the flag, and returns the encrypted ciphertext. However, there is a constraint: "The odds are NOT in your favour!" — you can only send messages with an odd number of bytes.
+
+# Solution:
+
+I started by analyzing the source code provided (chal.py). The service implements a classic AES ECB Oracle, but with a twist.
+
+Encryption: It uses AES.MODE_ECB.
+
+```
+cipher = AES.new(KEY, AES.MODE_ECB)
+c = cipher.encrypt(pad(message + FLAG, 16))
+```
+Vulnerability: ECB mode is deterministic. 
+
+The same plaintext block always encrypts to the same ciphertext block. 
+
+This usually allows for a "Byte-at-a-Time" Chosen Plaintext Attack (CPA).
+
+The "Oddity" (Constraint):
+```
+assert len(message) % 2 == 1
+```
+The server rejects any input that isn't an odd number of bytes.
+
+The Problem
+
+In a standard ECB attack, we recover the flag byte-by-byte by shifting the input length by 1.
+
+To target the 1st byte, we send 15 bytes (Length: 15 $\rightarrow$ Odd $\rightarrow$ Allowed).
+
+To target the 2nd byte, we send 14 bytes (Length: 14 $\rightarrow$ Even $\rightarrow$ Blocked).
+
+Because I couldn't send even-length padding, I couldn't shift the flag by a single byte to isolate every character.
+
+The Solution: 
+
+Pair-at-a-Time
+
+Since I couldn't shift by 1, I shifted by 2 bytes at a time. 
+
+This allowed me to always send odd-length padding (e.g., 15 bytes, then 13 bytes, etc.) but forced me to brute-force two characters simultaneously instead of one.
+
+Complexity: A standard attack is $256$ guesses per byte.
+
+A "pair" attack is $256^2$ ($65,536$) guesses.
+
+Optimization: 
+
+The challenge provided a reduced charset in the comments: nite{[-_A-Da-z0-4]}. 
+
+This reduced the search space to roughly $37^2 \approx 1,369$ possibilities per pair, which is feasible over a network.
+
+Implementation
+
+I wrote a solver using pwntools. The script calculates the necessary padding to align two unknown flag bytes at the end of a 16-byte block, retrieves the target ciphertext, and then iterates through all character pairs (e.g., "aa", "ab", "ac"...) until the ciphertext matches.
+
+```
+from pwn import *
+import string
+import sys
+import time
+
+# --- CONFIGURATION ---
+HOST = 'spaesoddity.nitephase.live' 
+PORT = 45673
+
+# Charset: nite{[-_A-Da-z0-4]}
+CHARSET = "-_ABCD" + string.ascii_lowercase + "01234" + "}"
+
+def get_oracle(io, payload):
+    # Sends payload, handles reconnection if needed
+    while True:
+        try:
+            io.sendlineafter(b'input in hex:', payload.hex().encode())
+            return io.recvline().strip().decode()
+        except Exception:
+            io.close()
+            time.sleep(1)
+            io = remote(HOST, PORT, level='error')
+
+def solve():
+    context.log_level = 'error'
+    
+    # [1] Resume from the last known correct part
+    flag = b'nite{D4v1d_B0w1'
+    print(f"[*] Resuming attack. Current flag: {flag.decode()}")
+
+    io = remote(HOST, PORT, level='error')
+
+    while len(flag) < 49:
+        print(f"\n[*] Solving chars at index {len(flag)} & {len(flag)+1}...", end=' ')
+        
+        # Calculate padding to align target to the end of a block
+        block_len = 16
+        # length of (Flag + 2 guesses)
+        content_len = len(flag) + 2
+        
+        bytes_needed = content_len % block_len
+        padding_len = (block_len - bytes_needed) % block_len
+        
+        # [CRITICAL FIX] Calculate WHICH block index we care about
+        # Total bytes = Padding + Flag + 2 Guesses
+        # Since we aligned it, this is perfectly divisible by 16
+        total_len = padding_len + content_len
+        target_block_index = (total_len // 16) - 1
+        
+        # Calculate hex slice indices (32 hex chars per block)
+        start_slice = target_block_index * 32
+        end_slice = (target_block_index + 1) * 32
+        
+        # 1. Get Target Block (The "Truth")
+        target_payload = b'A' * padding_len
+        encrypted_hex = get_oracle(io, target_payload)
+        
+        # Grab the SPECIFIC block we are targeting
+        target_block = encrypted_hex[start_slice:end_slice]
+        
+        # 2. Brute force 2 chars
+        found = False
+        for c1 in CHARSET:
+            for c2 in CHARSET:
+                guess_chars = (c1 + c2).encode()
+                
+                # Payload: [ Pad | Known | Guess | Dummy ]
+                # We need the dummy to keep the total length ODD for the server check
+                guess_payload = target_payload + flag + guess_chars + b'X'
+                
+                guess_hex = get_oracle(io, guess_payload)
+                
+                # Compare the SPECIFIC block
+                if guess_hex[start_slice:end_slice] == target_block:
+                    flag += guess_chars
+                    print(f"\n[+] MATCH: {c1+c2} -> {flag.decode()}")
+                    found = True
+                    break
+            if found: break
+        
+        if not found:
+            print("\n[-] Failed to find pair. Charset might be missing chars.")
+            break
+
+    print(f"\n[SUCCESS] Final Flag: {flag.decode()}")
+    io.close()
+
+if __name__ == '__main__':
+    solve()
+```
+
+## Flag
+```
+nite{D4v1d_B0w13-s_0dds_w3r3_n3v3r_1n_y0ur_f4v0ur}
+```
+
+## Concepts learnt:
+
+AES ECB Oracle Attack: Exploiting the deterministic nature of Electronic Codebook mode to leak plaintext.
+
+Chosen Plaintext Attack (CPA): Interacting with an oracle to encrypt specific data to verify guesses.
+
+Bypassing Input Constraints: Adapting the standard "Byte-at-a-Time" attack to a "Pair-at-a-Time" approach to satisfy the odd-length requirement.
+
+## Notes:
+
+Docker Compatibility: I ran into an issue where docker-compose (v1.29) failed because it couldn't handle the ContainerConfig field from newer Docker Engine builds. I fixed this by using the modern docker compose (v2) command or disabling BuildKit.
+
+Optimization: Initially, the script was slow because it established a new connection for every guess. For the remote target, I optimized this by using a connection pool (threading) to check multiple guesses in parallel.
+
+## Resources 
+
+https://aes.cryptohack.org/ecb_oracle/
+
+https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation
+
+https://docs.pwntools.com/en/stable/
