@@ -211,3 +211,183 @@ The reverse sequence (15, 14, 13...) was close to the target, likely because:
 - [SciPy Optimization Documentation](https://docs.scipy.org/doc/scipy/reference/optimize.html) - For `minimize` and `differential_evolution` functions
 - [NumPy Documentation](https://numpy.org/doc/) - Array operations for implementing the neural network
 - [Differential Evolution Algorithm](https://en.wikipedia.org/wiki/Differential_evolution) - Global optimization technique used in the solution
+
+  ***
+
+  
+# Antakshari 
+
+ My friend can never remember movie names, absolutely hopeless. This time he only recalls six cast members, nothing else. He's always been dense, but we've been tight for years, so I guess I'm stuck helping him again. Can you figure out the movie he's trying to remember?
+
+The challenge provides two files:
+
+* `latent_vectors.npy`
+* `partial_edges.npy`
+
+The goal is to recover the **six actor node IDs** corresponding to the remembered cast and submit them in **descending order**.
+
+
+
+## Solution:
+
+### Initial analysis
+
+We are given:
+
+* A set of **latent vectors** (201 × 64), representing actors embedded in a learned feature space.
+* A **partial edge list**, representing incomplete co-acting relationships.
+
+At first glance, the edges suggest a graph problem, but the challenge title and category indicate this is an **AI/ML-based challenge**, meaning the embeddings are likely the primary signal.
+
+
+Challenge description page showing the input field asking for
+**“ACTOR NODE SEQUENCE IN DESCENDING ORDER”**
+
+
+### Exploring the graph (red herring)
+
+The initial approach was to:
+
+* Build a graph from `partial_edges.npy`
+* Look for:
+
+  * cliques
+  * paths of length 6
+  * connected components
+
+However, this quickly revealed:
+
+* No connected component contained 6 nodes
+* No simple path of length 6 existed
+* The edge data was **partial and insufficient**
+
+This indicated the graph was **not meant to be used directly** to recover the cast.
+
+
+### Key insight: latent space is the real signal
+
+Since:
+
+* The edges are partial
+* Actor names are never provided
+* The challenge is AI-themed
+
+The correct interpretation is:
+
+The six cast members are the **six actors that form the tightest cluster in latent space**.
+
+In other words:
+
+* Actors from the same movie should be **close together in the embedding space**
+* We need to find the **most compact group of 6 vectors**
+
+
+
+### Final approach (pure NumPy, no ML libraries)
+
+To avoid dependency issues and keep the solution deterministic:
+
+1. Load the latent vectors
+2. Compute the **pairwise distance matrix**
+3. For each actor:
+
+   * Take its 5 nearest neighbors
+   * Form a 6-node candidate group
+4. Score each group using **average intra-group distance**
+5. Select the tightest group
+6. Sort node IDs in **descending order** (as required by the UI)
+
+This works efficiently because the dataset is small (201 nodes).
+
+
+
+### Final solver script
+
+```
+python
+import numpy as np
+
+# Load latent vectors
+vectors = np.load("latent_vectors.npy")
+n = vectors.shape[0]
+
+# Compute pairwise distance matrix
+dists = np.linalg.norm(
+    vectors[:, None, :] - vectors[None, :, :],
+    axis=2
+)
+
+best_score = float("inf")
+best_group = None
+
+# For each node, consider its 5 nearest neighbors
+for i in range(n):
+    neighbors = np.argsort(dists[i])[1:6]  # exclude itself
+    group = np.concatenate(([i], neighbors))
+
+    # Average intra-group distance
+    sub = dists[np.ix_(group, group)]
+    score = np.mean(sub)
+
+    if score < best_score:
+        best_score = score
+        best_group = group
+
+# Sort for submission
+answer = sorted(best_group, reverse=True)
+
+print("SUBMIT THIS:")
+print(",".join(map(str, answer)))
+```
+
+
+## Flag:
+
+```
+nite{Diehard_1891771341083729}
+
+```
+
+## Concepts learnt:
+
+* **Latent embeddings**
+  Learned vector representations that capture semantic similarity between entities (here, actors).
+
+* **Clustering in embedding space**
+  Items belonging to the same real-world group (movie cast) tend to cluster closely in latent space.
+
+* **Why partial graphs can be misleading**
+  In AI challenges, auxiliary data (edges) may be incomplete and not suitable for direct graph algorithms.
+
+* **Distance-based clustering without ML libraries**
+  Small datasets can be clustered using pure NumPy by analyzing pairwise distances.
+
+---
+
+## Notes:
+
+* Initially attempted:
+
+  * Clique detection
+  * Path-based (“Antakshari”) interpretations
+  * Graph centrality methods
+    All failed due to incomplete edge data.
+
+* Also encountered:
+
+  * `networkx` limitations
+  * `scikit-learn` + NumPy 2.x compatibility issues
+    These were avoided by switching to a **pure NumPy solution**.
+
+* The key turning point was recognizing that:
+
+   **The embeddings, not the graph, encode the answer.**
+
+## Resources:
+
+* [NumPy documentation](https://numpy.org/doc/)
+* [Understanding embeddings in ML](https://developers.google.com/machine-learning/crash-course/embeddings)
+* [Pairwise distance computation](https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html)
+
+
+
