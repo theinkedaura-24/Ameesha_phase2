@@ -304,7 +304,6 @@ This works efficiently because the dataset is small (201 nodes).
 ### Final solver script
 
 ```
-python
 import numpy as np
 
 # Load latent vectors
